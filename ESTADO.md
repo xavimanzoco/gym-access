@@ -38,8 +38,16 @@ si tiene la **cuota al día** se abre el molinete.
 - **Relé → Pico**: `VCC→pin40 (VBUS 5V)`, `GND→pin38`, `IN→pin20 (GP15)`.
 - **Pico → PC**: por USB (serie). La PC manda `ABRIR\n` para abrir.
 
-## ⚠️ PROBLEMA PENDIENTE: comunicación PC ↔ Pico por serie
-En la **Mac** no se logró comunicar con el Pico por USB-serie:
+## ✅ RESUELTO: comunicación PC ↔ Pico por serie
+**En Windows funciona de punta a punta** (relé andando, lee bien). El problema
+era el **dongle/hub USB-C de la Mac**, que dejaba pasar enumeración + flasheo
+pero rompía los datos del serie CDC. En Windows (aun con hub) anda bien.
+
+Además, `molineteController.ts` ya quedó **multiplataforma**: en Windows escribe
+al puerto **COM** con PowerShell, en Mac/Linux con `stty`. Se setea con la env
+`MOLINETE_PORT` (Windows: `COM3`; Mac: `/dev/tty.usbmodemXXXX`).
+
+Historial del problema en la **Mac**:
 - El Pico **enumera** (`/dev/cu.usbmodem…`, product "Pico") y el **firmware corre**
   (LED parpadea), PERO no recibe comandos ni transmite datos. Ni siquiera un firmware
   que imprime sin parar se lee (`test_serie.uf2` imprime `PICO_VIVO` y no llega nada),
@@ -62,9 +70,9 @@ En la **Mac** no se logró comunicar con el Pico por USB-serie:
 ## Próximos pasos (cuando el serie ande)
 1. Reflashear `pico/molinete_pico.uf2` (firmware real): Pico en BOOTSEL → copiar el
    `.uf2` al disco `RPI-RP2`.
-2. **Adaptar el lado PC para Windows**: `src/lib/services/hardware/molineteController.ts`
-   hoy escribe al puerto con `stty` (macOS/Linux). En **Windows** hay que escribir al
-   puerto **COM** (otra implementación). Setear la env `MOLINETE_PORT` al COM del Pico.
+2. ✅ HECHO — `molineteController.ts` ya es multiplataforma (Windows COM por
+   PowerShell + Mac/Linux por `stty`). Solo hay que setear `MOLINETE_PORT` al
+   puerto del Pico (Windows: `COM3`, se ve en el Administrador de dispositivos).
 3. Probar el circuito completo: DNI/huella → app valida → `ABRIR` → relé → abre.
 4. Empaquetar como instalador para la PC del gimnasio.
 
