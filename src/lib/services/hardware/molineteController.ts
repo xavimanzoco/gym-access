@@ -14,12 +14,18 @@ import { writeFileSync } from "node:fs";
  *   - SALIDA (abrir): PC → USB → Raspberry Pi Zero → relé → molinete gira.
  *     Este archivo se encarga SOLO de la salida: mandarle a la Pi la orden.
  *
- * La Pi corre `pi/molinete_relay.py`: escucha el USB-serie y, cuando recibe
- * "ABRIR", pulsa el relé por GPIO. Acá le escribimos ese comando al puerto serie
- * (sin librerías nativas: configuramos el puerto con `stty` y escribimos al
- * device). El puerto se define con la variable de entorno `MOLINETE_PORT`
- * (ej. en Mac `/dev/tty.usbmodem1101`). Si no está seteada, se usa el modo
- * simulado, así todo el flujo se puede probar sin hardware.
+ * El Pico (`pico/molinete_pico.ino`) escucha el USB-serie y, cuando recibe
+ * "ABRIR", pulsa el relé. Acá le escribimos ese comando al puerto serie (sin
+ * librerías nativas: configuramos el puerto con el comando del SO y
+ * escribimos al device — `stty` en macOS/Linux, `mode` en Windows). El puerto
+ * se define con la variable de entorno `MOLINETE_PORT` (ej. en Mac
+ * `/dev/tty.usbmodem1101`, en Windows `COM3`; el número de puerto cambia según
+ * la PC, así que hay que configurarlo en cada instalación). Si no está
+ * seteada, se usa el modo simulado, así todo el flujo se puede probar sin
+ * hardware.
+ *
+ * En Windows el Pico solo transmite si el puerto se abre con DTR/RTS activos
+ * (verificado 2026-07-24, ver ESTADO.md) — por eso `mode` los fuerza a "on".
  */
 
 /** Puerto serie de la Pi. Sin esto, el controlador queda en modo simulado. */
@@ -42,8 +48,17 @@ class MolineteSerie implements MolineteController {
   constructor(private readonly puerto: string) {}
 
   async abrir(): Promise<void> {
-    // Configura el puerto en modo "raw" a la velocidad acordada.
-    // macOS usa `stty -f <port>`; Linux `stty -F <port>`.
+    if (process.platform === "win32") {
+      this.configurarPuertoWindows();
+    } else {
+      this.configurarPuertoUnix();
+    }
+    writeFileSync(this.rutaDispositivo(), COMANDO_ABRIR);
+    console.info(`[molinete] Orden "ABRIR" enviada a ${this.puerto}`);
+  }
+
+  /** macOS usa `stty -f <port>`; Linux `stty -F <port>`. Modo "raw" a la velocidad acordada. */
+  private configurarPuertoUnix(): void {
     const flag = process.platform === "darwin" ? "-f" : "-F";
     const stty = spawnSync("stty", [flag, this.puerto, BAUD, "raw", "-echo"]);
     if (stty.status !== 0) {
@@ -51,8 +66,29 @@ class MolineteSerie implements MolineteController {
         `No se pudo configurar el puerto ${this.puerto}: ${stty.stderr?.toString().trim()}`,
       );
     }
-    writeFileSync(this.puerto, COMANDO_ABRIR);
-    console.info(`[molinete] Orden "ABRIR" enviada a ${this.puerto}`);
+  }
+
+  /** `mode.com` configura baud y fuerza DTR/RTS, que el Pico necesita para transmitir por USB-serie. */
+  private configurarPuertoWindows(): void {
+    const mode = spawnSync("mode", [
+      `${this.puerto}:`,
+      `baud=${BAUD}`,
+      "parity=n",
+      "data=8",
+      "stop=1",
+      "dtr=on",
+      "rts=on",
+    ]);
+    if (mode.status !== 0) {
+      throw new Error(
+        `No se pudo configurar el puerto ${this.puerto}: ${mode.stderr?.toString().trim()}`,
+      );
+    }
+  }
+
+  /** Windows requiere el prefijo `\\.\` para escribir directo a un dispositivo serie. */
+  private rutaDispositivo(): string {
+    return process.platform === "win32" ? `\\\\.\\${this.puerto}` : this.puerto;
   }
 }
 

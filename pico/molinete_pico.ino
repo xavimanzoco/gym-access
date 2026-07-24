@@ -23,11 +23,11 @@
  *   verde  -> NO   (al activar, une COM-NO => blanco-verde => LIBRE)
  *   Si al probar queda al revés, invertí rojo y verde.
  *
- * Relé al Pico:  VCC->pin40(VBUS) · GND->pin38 · IN->pin20(GP15)
+ * Relé al Pico:  VCC(+)->pin40(VBUS) · GND(-)->pin33(GND) · IN(S)->pin34(GP28)
  */
 
 // ── Configuración ────────────────────────────────────────────────────────────
-const int  RELAY_PIN         = 15;    // GP15 (pin físico 20). Debe coincidir con el cableado.
+const int  RELAY_PIN         = 28;    // GP28 (pin físico 34). Debe coincidir con el cableado.
 const int  LED_PIN           = LED_BUILTIN; // GP25, LED de la plaquita
 const bool ACTIVE_HIGH       = true;  // true: GP15 en ALTO activa el relé (abre).
                                       // Si al ARRANCAR el molinete queda LIBRE, poné false.
