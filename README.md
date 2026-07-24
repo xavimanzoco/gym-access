@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Gym Access
 
-## Getting Started
+Sistema de **control de acceso y socios** para un gimnasio. Pensado para correr
+**100% offline en una sola PC** (Windows) de recepción: no necesita internet ni
+servidores en la nube.
 
-First, run the development server:
+## Qué hace
+
+- **Ingreso** (kiosco): el socio ingresa su DNI en el molinete; el sistema valida
+  la cuota y, si está al día, ordena abrir el molinete. Registra cada intento.
+- **Socios**: alta, búsqueda y baja de socios. El DNI es la credencial.
+- **Pagos**: registro de cuotas; actualiza automáticamente el vencimiento del socio.
+- **Reportes**: recaudación del día, ingresos, socios activos y cuotas vencidas.
+
+## Stack
+
+- **Next.js 16** (App Router) + **React 19** + **Tailwind CSS 4**.
+- **SQLite** vía `node:sqlite` (incorporado en Node, sin módulos nativos que
+  compilar). La base es un único archivo en disco.
+- Arquitectura por capas: `page` → `components` → `services` → `repositories` → DB.
+
+## Correr en desarrollo
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abrir http://localhost:3000. La base de datos se crea sola en `data/gym.db` la
+primera vez (con planes de ejemplo). Se puede cambiar su ubicación con la variable
+de entorno `GYM_DB_PATH`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Base de datos
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Archivo local en `data/gym.db` (ignorado por git).
+- Tablas: `planes`, `socios`, `pagos`, `accesos`. Ver [`src/lib/db/schema.ts`](src/lib/db/schema.ts).
+- Backup = copiar el archivo `gym.db`. Restaurar = reemplazarlo.
 
-## Learn More
+## Molinete (pendiente de conectar)
 
-To learn more about Next.js, take a look at the following resources:
+El molinete manda el DNI a la PC como **teclado USB** (una sola vía). La orden de
+**apertura** viaja por un canal aparte hacia el **relé** ya conectado. Ese punto
+está aislado en un solo archivo, listo para completar:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [`src/lib/services/hardware/molineteController.ts`](src/lib/services/hardware/molineteController.ts)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Hoy usa una implementación **simulada** (loguea la orden). Al conectar el relé,
+solo se reemplaza el cuerpo de `abrir()`; el resto del sistema no cambia.
 
-## Deploy on Vercel
+## Empaquetado offline (siguiente paso)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`next.config.ts` usa `output: "standalone"`, que genera un servidor Node mínimo en
+`.next/standalone`. El plan es envolver eso en un **instalador `.exe`** (Tauri o
+Electron) para que en la PC del gimnasio se instale y se abra como una app normal,
+sin terminal y sin internet.

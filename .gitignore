@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# base de datos local (SQLite) — datos del gimnasio, no se versiona
+/data
+
 # next.js
 /.next/
 /out/
