@@ -1,10 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // `standalone` empaqueta un servidor Node mínimo en `.next/standalone`.
-  // Es lo que después vamos a envolver en un instalador de escritorio (.exe)
-  // para que corra 100% offline en la PC del gimnasio.
-  output: "standalone",
+  // better-sqlite3 es un módulo nativo: no debe empaquetarse, se carga
+  // directamente desde node_modules en el servidor.
+  serverExternalPackages: ["better-sqlite3"],
 };
 
 export default nextConfig;

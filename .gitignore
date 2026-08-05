@@ -13,9 +13,6 @@
 # testing
 /coverage
 
-# base de datos local (SQLite) — datos del gimnasio, no se versiona
-/data
-
 # next.js
 /.next/
 /out/
@@ -42,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+
+# Backup de firmware del molinete (binario, no versionar)
+hardware/molinete/*.bin
