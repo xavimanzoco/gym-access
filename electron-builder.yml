@@ -1,0 +1,43 @@
+appId: com.gymaccess.app
+productName: Gym Access
+copyright: Copyright © 2026
+
+directories:
+  output: dist-electron
+
+files:
+  - electron/**/*
+  - "!node_modules"
+  - "!src"
+  - "!.next"
+
+extraResources:
+  - from: .next/standalone
+    to: standalone
+    filter:
+      - "**/*"
+  - from: .next/static
+    to: standalone/.next/static
+    filter:
+      - "**/*"
+  - from: public
+    to: standalone/public
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: public/icon.ico
+
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  installerIcon: public/icon.ico
+  uninstallerIcon: public/icon.ico
+  shortcutName: Gym Access
+  createDesktopShortcut: true
+  createStartMenuShortcut: true

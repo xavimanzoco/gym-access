@@ -2,11 +2,16 @@
   "name": "gym-access",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "electron:dev": "concurrently --kill-others \"next dev --port 3847\" \"wait-on http://localhost:3847 && electron .\"",
+    "electron:preview": "next build && electron .",
+    "electron:build": "next build && electron-builder --win",
+    "electron:start": "electron ."
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -22,9 +27,13 @@
     "@types/node": "^26.1.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^10.0.4",
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^9.1.0"
   }
 }
