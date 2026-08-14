@@ -1,14 +1,18 @@
 import { AccesosRecientes } from "@/components/ingreso/AccesosRecientes";
+import { DejarPasarBoton } from "@/components/ingreso/DejarPasarBoton";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { accesoService } from "@/lib/services/accesoService";
 import { IngresoKiosk } from "@/app/ingreso/IngresoKiosk";
 
+/** Cuántos accesos recientes se muestran en el panel del kiosco. */
+const CANTIDAD_RECIENTES = 5;
+
 // Datos siempre frescos: es una pantalla en vivo.
 export const dynamic = "force-dynamic";
 
 export default function IngresoPage() {
-  const recientes = accesoService.recientes(12);
+  const recientes = accesoService.recientes(CANTIDAD_RECIENTES);
 
   return (
     <div className="flex h-full flex-col">
@@ -24,14 +28,18 @@ export default function IngresoPage() {
           </CardContent>
         </Card>
 
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle>Accesos recientes</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto pt-2">
-            <AccesosRecientes accesos={recientes} />
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Últimos ingresos</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <AccesosRecientes accesos={recientes} />
+            </CardContent>
+          </Card>
+
+          <DejarPasarBoton />
+        </div>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { Trash2 } from "lucide-react";
 import { eliminarSocio } from "@/app/socios/actions";
+import { ConfirmFormButton } from "@/components/ui/confirm-form-button";
 
 /** Botón de borrado con confirmación previa, dentro de un form server-action. */
 export function EliminarSocioBoton({
@@ -12,22 +13,17 @@ export function EliminarSocioBoton({
   nombre: string;
 }) {
   return (
-    <form
+    <ConfirmFormButton
       action={eliminarSocio}
-      onSubmit={(e) => {
-        if (!confirm(`¿Eliminar a ${nombre}? Esta acción no se puede deshacer.`)) {
-          e.preventDefault();
-        }
-      }}
-    >
-      <input type="hidden" name="id" value={id} />
-      <button
-        type="submit"
-        aria-label={`Eliminar ${nombre}`}
-        className="rounded-md p-2 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
-    </form>
+      campos={{ id }}
+      icono={Trash2}
+      ariaLabel={`Eliminar ${nombre}`}
+      titulo={`¿Eliminar a ${nombre}?`}
+      mensaje="Esta acción no se puede deshacer."
+      textoConfirmar="Eliminar"
+      tone="danger"
+      variante="texto"
+      etiqueta="Eliminar socio"
+    />
   );
 }

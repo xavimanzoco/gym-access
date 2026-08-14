@@ -37,6 +37,13 @@ export const socioService = {
     return actualizado;
   },
 
+  alternarActivo(id: number): Socio {
+    this.obtener(id); // valida existencia
+    const actualizado = socioRepository.alternarActivo(id);
+    if (!actualizado) throw new NotFoundError("El socio no existe");
+    return actualizado;
+  },
+
   eliminar(id: number): void {
     this.obtener(id); // valida existencia
     socioRepository.delete(id);

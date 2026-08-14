@@ -26,14 +26,13 @@ export const planRepository = {
     ).map(mapear);
   },
 
-  findActivos(): Plan[] {
-    return dbAll<PlanRow>(
-      "SELECT * FROM planes WHERE activo = 1 ORDER BY dias_duracion ASC",
-    ).map(mapear);
-  },
-
   findById(id: number): Plan | null {
     const row = dbGet<PlanRow>("SELECT * FROM planes WHERE id = ?", id);
+    return row ? mapear(row) : null;
+  },
+
+  findByNombre(nombre: string): Plan | null {
+    const row = dbGet<PlanRow>("SELECT * FROM planes WHERE nombre = ?", nombre);
     return row ? mapear(row) : null;
   },
 };

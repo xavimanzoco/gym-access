@@ -62,6 +62,29 @@ export const accesoService = {
     };
   },
 
+  /**
+   * Abre el molinete a mano, sin validar DNI (recepción deja pasar a alguien).
+   * Igual queda registrado en el historial de accesos, con motivo `MANUAL`.
+   */
+  async abrirManual(): Promise<ResultadoAcceso> {
+    accesoRepository.create({
+      socioId: null,
+      dniIngresado: "",
+      permitido: true,
+      motivo: "MANUAL",
+    });
+
+    await abrirMolinete();
+
+    return {
+      permitido: true,
+      motivo: "MANUAL",
+      mensaje: MENSAJE_POR_MOTIVO.MANUAL,
+      socio: null,
+      diasParaVencer: null,
+    };
+  },
+
   /** Últimos ingresos, para el panel en vivo del kiosco. */
   recientes(limite = 15): AccesoConSocio[] {
     return accesoRepository.recientes(limite);

@@ -6,13 +6,11 @@ import { crearSocio, type SocioFormState } from "@/app/socios/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import type { Plan } from "@/types";
 
 const ESTADO_INICIAL: SocioFormState = {};
 
-/** Formulario de alta de socio. Recibe los planes para el selector. */
-export function SocioForm({ planes }: { planes: Plan[] }) {
+/** Formulario de alta de socio. */
+export function SocioForm() {
   const [estado, accion, pendiente] = useActionState(crearSocio, ESTADO_INICIAL);
 
   return (
@@ -21,17 +19,6 @@ export function SocioForm({ planes }: { planes: Plan[] }) {
         <div>
           <Label htmlFor="dni">DNI *</Label>
           <Input id="dni" name="dni" inputMode="numeric" required />
-        </div>
-        <div>
-          <Label htmlFor="planId">Plan</Label>
-          <Select id="planId" name="planId" defaultValue="">
-            <option value="">Sin plan</option>
-            {planes.map((plan) => (
-              <option key={plan.id} value={plan.id}>
-                {plan.nombre}
-              </option>
-            ))}
-          </Select>
         </div>
         <div>
           <Label htmlFor="nombre">Nombre *</Label>
@@ -54,16 +41,6 @@ export function SocioForm({ planes }: { planes: Plan[] }) {
           <Input id="fechaNacimiento" name="fechaNacimiento" type="date" />
         </div>
       </div>
-
-      <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-        <input
-          type="checkbox"
-          name="activo"
-          defaultChecked
-          className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
-        />
-        Socio activo
-      </label>
 
       {estado.error && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">

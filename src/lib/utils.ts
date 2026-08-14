@@ -27,6 +27,21 @@ export function sumarDias(fechaISO: string, dias: number): string {
 }
 
 /**
+ * Vencimiento de cuota bajo el ciclo mensual del gimnasio: se paga cualquier
+ * día del mes y la cuota vale hasta el día 10 del mes siguiente (fecha fija de
+ * calendario, no "30 días desde el pago"). `mesesAdelante` permite saltar un
+ * ciclo extra (socio nuevo que se anota a fin de mes).
+ */
+export function proximoVencimientoDiaDiez(
+  fechaPagoISO: string,
+  mesesAdelante = 1,
+): string {
+  const fecha = new Date(`${fechaPagoISO}T00:00:00`);
+  const siguiente = new Date(fecha.getFullYear(), fecha.getMonth() + mesesAdelante, 10);
+  return fechaAISO(siguiente);
+}
+
+/**
  * Días entre dos fechas ISO (`hasta - desde`). Positivo si `hasta` es futuro.
  * Solo cuenta días de calendario, ignora horas.
  */

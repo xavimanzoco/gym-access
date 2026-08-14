@@ -133,6 +133,16 @@ export const socioRepository = {
     return this.findById(id);
   },
 
+  /** Invierte el estado activo/inactivo del socio. */
+  alternarActivo(id: number): Socio | null {
+    dbRun(
+      "UPDATE socios SET activo = NOT activo, actualizado_en = ? WHERE id = ?",
+      new Date().toISOString(),
+      id,
+    );
+    return this.findById(id);
+  },
+
   /** Actualiza el vencimiento de la cuota. Lo usa el registro de pagos. */
   actualizarVencimiento(id: number, vencimientoISO: string): void {
     dbRun(

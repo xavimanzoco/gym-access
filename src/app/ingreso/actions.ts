@@ -11,3 +11,11 @@ import type { ResultadoAcceso } from "@/types";
 export async function procesarIngreso(dni: string): Promise<ResultadoAcceso> {
   return accesoService.registrarIngreso(dni);
 }
+
+/**
+ * Abre el molinete a mano, sin DNI — botón de recepción para dejar pasar a
+ * alguien. Igual queda registro del acceso (motivo `MANUAL`).
+ */
+export async function abrirManual(): Promise<ResultadoAcceso> {
+  return accesoService.abrirManual();
+}

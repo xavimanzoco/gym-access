@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
-  CreditCard,
   DoorOpen,
+  LockOpen,
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { useAcceso } from "@/components/acceso/AccesoProvider";
 import { APP_NOMBRE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -21,12 +22,12 @@ interface ItemNav {
 const NAV: ItemNav[] = [
   { href: "/ingreso", etiqueta: "Ingreso", icono: DoorOpen },
   { href: "/socios", etiqueta: "Socios", icono: Users },
-  { href: "/pagos", etiqueta: "Pagos", icono: CreditCard },
   { href: "/reportes", etiqueta: "Reportes", icono: BarChart3 },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { abrirManual, pendiente } = useAcceso();
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
@@ -37,6 +38,18 @@ export function Sidebar() {
         <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
           {APP_NOMBRE}
         </span>
+      </div>
+
+      <div className="p-3">
+        <button
+          type="button"
+          onClick={abrirManual}
+          disabled={pendiente}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+        >
+          <LockOpen className="h-5 w-5" />
+          Abrir manual
+        </button>
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 p-3">

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { AppError } from "@/lib/errors/AppError";
+import { pagoService } from "@/lib/services/pagoService";
 import { socioService } from "@/lib/services/socioService";
 import { crearSocioSchema } from "@/lib/validations/socio";
 
@@ -21,7 +22,8 @@ function leerFormulario(formData: FormData) {
     email: String(formData.get("email") ?? ""),
     fechaNacimiento: String(formData.get("fechaNacimiento") ?? ""),
     planId: String(formData.get("planId") ?? ""),
-    activo: formData.get("activo") === "on",
+    // El alta siempre crea el socio activo; se desactiva después desde la tabla.
+    activo: true,
   };
 }
 
@@ -50,5 +52,29 @@ export async function eliminarSocio(formData: FormData): Promise<void> {
   if (Number.isInteger(id)) {
     socioService.eliminar(id);
     revalidatePath("/socios");
+  }
+  redirect("/socios");
+}
+
+/** Activa o desactiva un socio (bloquea/habilita su ingreso por molinete). */
+export async function alternarActivoSocio(formData: FormData): Promise<void> {
+  const id = Number(formData.get("id"));
+  if (Number.isInteger(id)) {
+    socioService.alternarActivo(id);
+    revalidatePath("/socios");
+    revalidatePath(`/socios/${id}`);
+  }
+}
+
+/** Pago rápido desde Socios (fila o detalle): cobra el plan Mensual con el método elegido. */
+export async function pagarMensual(formData: FormData): Promise<void> {
+  const id = Number(formData.get("id"));
+  const metodo = formData.get("metodo");
+  const metodoValido =
+    metodo === "efectivo" || metodo === "transferencia" ? metodo : "efectivo";
+  if (Number.isInteger(id)) {
+    pagoService.registrarPagoMensual(id, metodoValido);
+    revalidatePath("/socios");
+    revalidatePath(`/socios/${id}`);
   }
 }

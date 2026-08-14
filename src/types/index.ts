@@ -62,7 +62,8 @@ export type MotivoAcceso =
   | "OK"
   | "CUOTA_VENCIDA"
   | "SOCIO_INEXISTENTE"
-  | "SOCIO_INACTIVO";
+  | "SOCIO_INACTIVO"
+  | "MANUAL";
 
 /** Registro de un intento de ingreso por el molinete. */
 export interface Acceso {

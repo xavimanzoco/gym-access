@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { procesarIngreso } from "@/app/ingreso/actions";
+import { abrirManual, procesarIngreso } from "@/app/ingreso/actions";
 import { AccesoOverlay } from "@/components/acceso/AccesoOverlay";
 import type { ResultadoAcceso } from "@/types";
 
@@ -20,6 +20,8 @@ const DURACION_RESULTADO_MS = 4500;
 interface AccesoContextValue {
   /** Valida un DNI, registra el ingreso y muestra el resultado en pantalla. */
   procesar: (dni: string) => void;
+  /** Abre el molinete a mano, sin DNI, y muestra el resultado en pantalla. */
+  abrirManual: () => void;
   pendiente: boolean;
 }
 
@@ -54,6 +56,14 @@ export function AccesoProvider({ children }: { children: ReactNode }) {
     [router],
   );
 
+  const abrirManualCb = useCallback(() => {
+    startTransition(async () => {
+      const res = await abrirManual();
+      setResultado(res);
+      router.refresh(); // refresca el listado de accesos recientes si está visible
+    });
+  }, [router]);
+
   useEffect(() => {
     if (!resultado) return;
     const timer = setTimeout(() => setResultado(null), DURACION_RESULTADO_MS);
@@ -61,7 +71,9 @@ export function AccesoProvider({ children }: { children: ReactNode }) {
   }, [resultado]);
 
   return (
-    <AccesoContext.Provider value={{ procesar, pendiente }}>
+    <AccesoContext.Provider
+      value={{ procesar, abrirManual: abrirManualCb, pendiente }}
+    >
       {children}
       {resultado && (
         <AccesoOverlay

@@ -1,5 +1,8 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { EliminarSocioBoton } from "@/components/socios/EliminarSocioBoton";
+import { PagoMensualBoton } from "@/components/socios/PagoMensualBoton";
 import { formatearFecha, hoyISO } from "@/lib/utils";
 import type { Socio } from "@/types";
 
@@ -19,6 +22,8 @@ interface SociosTableProps {
 }
 
 export function SociosTable({ socios, planesById }: SociosTableProps) {
+  const router = useRouter();
+
   if (socios.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-zinc-200 py-16 text-center text-sm text-zinc-400 dark:border-zinc-800">
@@ -48,7 +53,13 @@ export function SociosTable({ socios, planesById }: SociosTableProps) {
             return (
               <tr
                 key={socio.id}
-                className="text-zinc-700 dark:text-zinc-300"
+                role="button"
+                tabIndex={0}
+                onClick={() => router.push(`/socios/${socio.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") router.push(`/socios/${socio.id}`);
+                }}
+                className="cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-900"
               >
                 <td className="px-4 py-3 font-mono">{socio.dni}</td>
                 <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">
@@ -61,8 +72,11 @@ export function SociosTable({ socios, planesById }: SociosTableProps) {
                 <td className="px-4 py-3">
                   <Badge tone={estado.tone}>{estado.texto}</Badge>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <EliminarSocioBoton
+                <td
+                  className="px-4 py-3 text-right"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <PagoMensualBoton
                     id={socio.id}
                     nombre={`${socio.nombre} ${socio.apellido}`}
                   />

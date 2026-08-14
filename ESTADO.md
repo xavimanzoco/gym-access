@@ -57,9 +57,23 @@ si tiene la **cuota al día** se abre el molinete.
 - **Truco útil**: para entrar a modo BOOTSEL sin tocar el botón físico, alcanza con
   abrir el puerto serie a **1200 baudios** y cerrarlo — el Pico se resetea solo al
   disco `RPI-RP2` (funciona con el core Arduino-Pico / earlephilhower).
-- **Dato para `molineteController.ts` en Windows**: configurar el puerto con
-  `mode COMx: baud=9600 parity=n data=8 stop=1 dtr=on rts=on` y escribir a
-  `\\.\COMx` (no alcanza con escribir directo al nombre del puerto).
+
+## ✅ Circuito completo confirmado (2026-08-05, en Windows)
+DNI tecleado en la app → valida cuota → `ABRIR` → relé → molinete abre. Probado de
+punta a punta con la app corriendo (`npm run dev`, `MOLINETE_PORT=COM3`).
+
+**Bug encontrado y corregido en el camino**: la implementación anterior de
+`enviarWindows` en `molineteController.ts` configuraba el puerto con `mode` (DTR/RTS
+on) pero después escribía el comando con `writeFileSync` a `\\.\COMx` — eso **no
+funciona**, la API de archivos de Node no sirve para transmitir por un puerto serie
+(se confirmó también fallando igual con `[System.IO.File]::WriteAllText` en .NET:
+tira `NotSupportedException`). El relé no reaccionaba y no había error visible (el
+`try/catch` de `abrirMolinete()` se comía cualquier excepción).
+
+Fix: en Windows ahora se abre el puerto con `System.IO.Ports.SerialPort` (DTR/RTS
+activos) vía un script de PowerShell invocado con `spawnSync`, se escribe el comando,
+y se cierra. Es el mismo método que ya se había confirmado a mano el 2026-07-24 —
+la parte que faltaba corregir era el código de la app, no el hardware.
 
 ## ⚠️ Pendiente de confirmar: si esto va a andar en la Mac
 Lo del hardware (firmware con `RELAY_PIN=28`, cableado del relé) queda grabado en
@@ -86,10 +100,7 @@ que el circuito completo funciona.
 
 ## Próximos pasos
 1. **Confirmar el serie en la Mac** (ver aviso arriba) — es lo primero a probar.
-2. **Probar el circuito completo real**: DNI/huella → app valida → `ABRIR` → relé →
-   abre. (Ya validado el tramo PC↔Pico↔relé por separado en Windows; falta correr
-   la app y probar de punta a punta.)
-3. Empaquetar como instalador para la PC del gimnasio — **ojo**: la PC de pruebas de
+2. Empaquetar como instalador para la PC del gimnasio — **ojo**: la PC de pruebas de
    Windows usada el 2026-07-24 NO es la PC final del gimnasio, así que el número de
    puerto COM va a cambiar; usar la env `MOLINETE_PORT` en cada instalación.
 
