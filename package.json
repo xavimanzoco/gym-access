@@ -10,7 +10,7 @@
     "lint": "eslint",
     "electron:dev": "concurrently --kill-others \"next dev --port 3847\" \"wait-on http://localhost:3847 && electron .\"",
     "electron:preview": "next build && electron .",
-    "electron:build": "next build && electron-builder --win",
+    "electron:build": "next build && node scripts/prepare-electron.js && electron-builder --win",
     "electron:start": "electron ."
   },
   "dependencies": {
@@ -28,7 +28,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "concurrently": "^10.0.4",
-    "electron": "^43.4.0",
+    "electron": "^35.7.5",
     "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",

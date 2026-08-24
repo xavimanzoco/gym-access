@@ -5,6 +5,8 @@ copyright: Copyright © 2026
 directories:
   output: dist-electron
 
+asar: false
+
 files:
   - electron/**/*
   - "!node_modules"
@@ -12,18 +14,8 @@ files:
   - "!.next"
 
 extraResources:
-  - from: .next/standalone
+  - from: .next/standalone-flat
     to: standalone
-    filter:
-      - "**/*"
-  - from: .next/static
-    to: standalone/.next/static
-    filter:
-      - "**/*"
-  - from: public
-    to: standalone/public
-    filter:
-      - "**/*"
 
 win:
   target:
