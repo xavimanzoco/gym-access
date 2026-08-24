@@ -2,9 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { AppError } from "@/lib/errors/AppError";
+import { AppError, ValidationError } from "@/lib/errors/AppError";
 import { pagoService } from "@/lib/services/pagoService";
 import { socioService } from "@/lib/services/socioService";
+import {
+  socioImportService,
+  type VistaPreviaImport,
+} from "@/lib/services/socioImportService";
 import { crearSocioSchema } from "@/lib/validations/socio";
 
 /** Estado que devuelve la acción al formulario (para `useActionState`). */
@@ -63,6 +67,64 @@ export async function alternarActivoSocio(formData: FormData): Promise<void> {
     socioService.alternarActivo(id);
     revalidatePath("/socios");
     revalidatePath(`/socios/${id}`);
+  }
+}
+
+/** Extensiones que aceptamos en la importación. */
+const EXTENSIONES_VALIDAS = [".xlsx", ".xlsm"];
+
+/** Lee el archivo del formulario y valida que sea una planilla. */
+async function leerPlanilla(formData: FormData): Promise<Buffer> {
+  const archivo = formData.get("archivo");
+
+  if (!(archivo instanceof File) || archivo.size === 0) {
+    throw new ValidationError("Elegí un archivo de Excel.");
+  }
+
+  const nombre = archivo.name.toLowerCase();
+  if (!EXTENSIONES_VALIDAS.some((ext) => nombre.endsWith(ext))) {
+    throw new ValidationError(
+      "El archivo tiene que ser .xlsx. Si es un .xls o .csv, abrilo en Excel y usá “Guardar como → Libro de Excel (.xlsx)”.",
+    );
+  }
+
+  return Buffer.from(await archivo.arrayBuffer());
+}
+
+export interface ImportFormState {
+  error?: string;
+  /** Vista previa de lo que se importaría, antes de confirmar. */
+  vistaPrevia?: VistaPreviaImport;
+  /** Resumen de una importación ya aplicada. */
+  resultado?: { importados: number; repetidos: number; descartados: number };
+}
+
+/** Paso 1: interpreta la planilla y devuelve la vista previa (no toca la base). */
+export async function analizarPlanillaSocios(
+  _prev: ImportFormState,
+  formData: FormData,
+): Promise<ImportFormState> {
+  try {
+    return { vistaPrevia: socioImportService.analizar(await leerPlanilla(formData)) };
+  } catch (error) {
+    if (error instanceof AppError) return { error: error.message };
+    throw error;
+  }
+}
+
+/** Paso 2: da de alta los socios de la planilla. */
+export async function importarSocios(
+  _prev: ImportFormState,
+  formData: FormData,
+): Promise<ImportFormState> {
+  try {
+    const resultado = socioImportService.confirmar(await leerPlanilla(formData));
+    revalidatePath("/socios");
+    revalidatePath("/reportes");
+    return { resultado };
+  } catch (error) {
+    if (error instanceof AppError) return { error: error.message };
+    throw error;
   }
 }
 

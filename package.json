@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --experimental-strip-types --test \"tests/*.test.ts\"",
     "electron:dev": "concurrently --kill-others \"next dev --port 3847\" \"wait-on http://localhost:3847 && electron .\"",
     "electron:preview": "next build && electron .",
     "electron:build": "next build && node scripts/prepare-electron.js && electron-builder --win",

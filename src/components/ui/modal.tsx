@@ -2,14 +2,30 @@
 
 import type { ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
+
+/** Ancho de la tarjeta: `sm` para confirmaciones, `lg` para listados. */
+type Ancho = "sm" | "lg";
+
+const ANCHOS: Record<Ancho, string> = {
+  sm: "max-w-sm",
+  lg: "max-w-3xl",
+};
+
 interface ModalProps {
   abierto: boolean;
   onClose: () => void;
+  ancho?: Ancho;
   children: ReactNode;
 }
 
 /** Overlay + tarjeta centrada, base de los carteles de confirmación/selección. */
-export function Modal({ abierto, onClose, children }: ModalProps) {
+export function Modal({
+  abierto,
+  onClose,
+  ancho = "sm",
+  children,
+}: ModalProps) {
   if (!abierto) return null;
 
   return (
@@ -21,7 +37,10 @@ export function Modal({ abierto, onClose, children }: ModalProps) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-zinc-900"
+        className={cn(
+          "flex max-h-[85vh] w-full flex-col rounded-2xl bg-white p-6 shadow-2xl dark:bg-zinc-900",
+          ANCHOS[ancho],
+        )}
       >
         {children}
       </div>

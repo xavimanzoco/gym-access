@@ -1,10 +1,10 @@
-import { dbAll, dbGet, dbRun } from "@/lib/db/client";
+import { dbAll, dbGet, dbRun, dbTransaction, getDb } from "@/lib/db/client";
 import { hoyISO } from "@/lib/utils";
 import type { Socio } from "@/types";
 
 interface SocioRow {
   id: number;
-  dni: string;
+  dni: string | null;
   nombre: string;
   apellido: string;
   telefono: string | null;
@@ -20,7 +20,8 @@ interface SocioRow {
 
 /** Datos para dar de alta un socio (sin campos calculados ni ids). */
 export interface CrearSocioData {
-  dni: string;
+  /** `null` si se desconoce; el socio queda sin credencial de molinete. */
+  dni: string | null;
   nombre: string;
   apellido: string;
   telefono: string | null;
@@ -72,6 +73,8 @@ export const socioRepository = {
   },
 
   findByDni(dni: string): Socio | null {
+    // Sin este corte, un DNI vacío podría emparejar filas viejas con `dni = ''`.
+    if (!dni) return null;
     const row = dbGet<SocioRow>("SELECT * FROM socios WHERE dni = ?", dni);
     return row ? mapear(row) : null;
   },
@@ -112,6 +115,52 @@ export const socioRepository = {
     const creado = this.findById(Number(resultado.lastInsertRowid));
     if (!creado) throw new Error("No se pudo crear el socio");
     return creado;
+  },
+
+  /**
+   * Alta masiva en una sola transacción (la usa la importación de Excel).
+   * Reutiliza una única sentencia preparada: con cientos de filas, preparar el
+   * INSERT una sola vez es bastante más rápido que llamar a `create()` en loop.
+   * Devuelve la cantidad insertada; si alguna falla, no se inserta ninguna.
+   */
+  createMany(datos: CrearSocioData[]): number {
+    if (datos.length === 0) return 0;
+
+    return dbTransaction(() => {
+      const ahora = new Date().toISOString();
+      const hoy = hoyISO();
+      const insertar = getDb().prepare(
+        `INSERT INTO socios
+           (dni, nombre, apellido, telefono, email, fecha_nacimiento,
+            plan_id, vencimiento, activo, fecha_alta, creado_en, actualizado_en)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
+      );
+
+      for (const data of datos) {
+        insertar.run(
+          data.dni,
+          data.nombre,
+          data.apellido,
+          data.telefono,
+          data.email,
+          data.fechaNacimiento,
+          data.planId,
+          data.activo ? 1 : 0,
+          hoy,
+          ahora,
+          ahora,
+        );
+      }
+      return datos.length;
+    });
+  },
+
+  /** DNIs ya usados, para detectar duplicados antes de una alta masiva. */
+  dnisExistentes(): Set<string> {
+    const filas = dbAll<{ dni: string }>(
+      "SELECT dni FROM socios WHERE dni IS NOT NULL",
+    );
+    return new Set(filas.map((f) => f.dni));
   },
 
   update(id: number, data: ActualizarSocioData): Socio | null {

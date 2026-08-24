@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ImportarExcelBoton } from "@/components/socios/ImportarExcelBoton";
 import { SociosTable } from "@/components/socios/SociosTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,12 +26,15 @@ export default async function SociosPage({
         titulo="Socios"
         descripcion={`${socios.length} socio(s)`}
         acciones={
-          <Button asChild>
-            <Link href="/socios/nuevo">
-              <Plus className="h-4 w-4" />
-              Nuevo socio
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <ImportarExcelBoton />
+            <Button asChild>
+              <Link href="/socios/nuevo">
+                <Plus className="h-4 w-4" />
+                Nuevo socio
+              </Link>
+            </Button>
+          </div>
         }
       />
 

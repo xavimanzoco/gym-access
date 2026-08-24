@@ -13,6 +13,11 @@
 # testing
 /coverage
 
+# Planillas de prueba de la importación: son padrones reales del gimnasio
+# (nombres, teléfonos y DNI de socios). No se versionan. El test que las usa
+# se saltea solo si el archivo no está.
+/tests/fixtures/*.xlsx
+
 # base de datos local (SQLite) — datos del gimnasio, no se versiona
 /data
 

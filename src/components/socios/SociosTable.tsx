@@ -61,7 +61,7 @@ export function SociosTable({ socios, planesById }: SociosTableProps) {
                 }}
                 className="cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-900"
               >
-                <td className="px-4 py-3 font-mono">{socio.dni}</td>
+                <td className="px-4 py-3 font-mono">{socio.dni ?? "—"}</td>
                 <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">
                   {socio.nombre} {socio.apellido}
                 </td>

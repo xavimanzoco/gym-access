@@ -20,8 +20,12 @@ export interface Plan {
 /** Socio del gimnasio. */
 export interface Socio {
   id: number;
-  /** Documento. Es la credencial que se teclea en el molinete. Único. */
-  dni: string;
+  /**
+   * Documento. Es la credencial que se teclea en el molinete. Único.
+   * `null` si el socio se cargó sin DNI (ej: importado de un Excel incompleto):
+   * figura en el padrón pero no puede identificarse en el molinete.
+   */
+  dni: string | null;
   nombre: string;
   apellido: string;
   telefono: string | null;

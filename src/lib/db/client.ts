@@ -1,7 +1,11 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { PLANES_SEMILLA, SCHEMA_SQL } from "@/lib/db/schema";
+import {
+  MIGRACION_DNI_OPCIONAL_SQL,
+  PLANES_SEMILLA,
+  SCHEMA_SQL,
+} from "@/lib/db/schema";
 
 /**
  * Cliente de la base de datos SQLite local (offline).
@@ -31,9 +35,39 @@ function crearConexion(): DatabaseSync {
   return db;
 }
 
+/**
+ * Aplica las migraciones pendientes de bases creadas por versiones anteriores.
+ * `CREATE TABLE IF NOT EXISTS` no toca una tabla que ya existe, así que los
+ * cambios de esquema sobre bases en uso hay que hacerlos acá.
+ */
+function migrar(db: DatabaseSync): void {
+  const columnas = db.prepare("PRAGMA table_info(socios)").all() as {
+    name: string;
+    notnull: number;
+  }[];
+  const dni = columnas.find((c) => c.name === "dni");
+
+  if (dni?.notnull === 1) {
+    // `PRAGMA foreign_keys` se ignora dentro de una transacción: hay que
+    // desactivarlo antes de abrirla.
+    db.exec("PRAGMA foreign_keys = OFF;");
+    try {
+      db.exec("BEGIN;");
+      db.exec(MIGRACION_DNI_OPCIONAL_SQL);
+      db.exec("COMMIT;");
+    } catch (error) {
+      db.exec("ROLLBACK;");
+      throw error;
+    } finally {
+      db.exec("PRAGMA foreign_keys = ON;");
+    }
+  }
+}
+
 /** Crea las tablas (si no existen) y carga los planes semilla la primera vez. */
 function inicializar(db: DatabaseSync): void {
   db.exec(SCHEMA_SQL);
+  migrar(db);
 
   const { n } = db.prepare("SELECT COUNT(*) AS n FROM planes").get() as {
     n: number;
@@ -80,4 +114,22 @@ export function dbGet<T>(sql: string, ...params: Param[]): T | undefined {
 
 export function dbRun(sql: string, ...params: Param[]) {
   return getDb().prepare(sql).run(...params);
+}
+
+/**
+ * Ejecuta `fn` dentro de una transacción: si lanza, se revierte todo.
+ * Necesario para las altas masivas (importación), donde no queremos quedar
+ * con la mitad de los socios cargados.
+ */
+export function dbTransaction<T>(fn: () => T): T {
+  const db = getDb();
+  db.exec("BEGIN;");
+  try {
+    const resultado = fn();
+    db.exec("COMMIT;");
+    return resultado;
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
 }

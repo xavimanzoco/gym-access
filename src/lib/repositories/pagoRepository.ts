@@ -16,14 +16,14 @@ interface PagoRow {
 interface PagoConSocioRow extends PagoRow {
   socio_nombre: string;
   socio_apellido: string;
-  socio_dni: string;
+  socio_dni: string | null;
 }
 
 /** Fila de pago con datos del socio, para listados y reportes. */
 export interface PagoConSocio extends Pago {
   socioNombre: string;
   socioApellido: string;
-  socioDni: string;
+  socioDni: string | null;
 }
 
 export interface CrearPagoData {

@@ -48,7 +48,7 @@ export default async function SocioDetallePage({
     <div>
       <PageHeader
         titulo={nombre}
-        descripcion={`DNI ${socio.dni}`}
+        descripcion={socio.dni ? `DNI ${socio.dni}` : "Sin DNI cargado"}
         acciones={
           <Link
             href="/socios"

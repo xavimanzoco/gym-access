@@ -24,7 +24,8 @@ export const socioService = {
   },
 
   crear(data: CrearSocioData): Socio {
-    if (socioRepository.findByDni(data.dni)) {
+    // Sin DNI no hay unicidad que validar: el socio queda sin credencial.
+    if (data.dni && socioRepository.findByDni(data.dni)) {
       throw new ValidationError(`Ya existe un socio con el DNI ${data.dni}`);
     }
     return socioRepository.create(data);
