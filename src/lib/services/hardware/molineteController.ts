@@ -32,10 +32,16 @@ import { writeFileSync } from "node:fs";
  * 2026-08-05). El método que sí funciona es `System.IO.Ports.SerialPort`
  * (.NET) — acá se invoca vía PowerShell.
  *
- * La detección del puerto se repite en CADA apertura (no se guarda en
- * memoria): si el Pico se desenchufa y se vuelve a enchufar —a veces Windows
- * le asigna otro número de COM—, la próxima apertura lo encuentra solo, sin
- * necesidad de reiniciar la app (verificado 2026-08-05).
+ * El puerto detectado se GUARDA EN MEMORIA (`puertoCacheado`): la consulta WMI
+ * recorre todos los dispositivos PnP de la máquina y tarda segundos en un
+ * equipo modesto, así que pagarla en cada ingreso demoraba el desbloqueo. Se
+ * detecta una vez y se reusa.
+ *
+ * El hot-replug del Pico se mantiene igual: si un envío falla, se descarta el
+ * puerto cacheado y se vuelve a detectar en el acto (`abrirMolinete` reintenta
+ * una vez). Así, si Windows le asignó otro número de COM al reenchufarlo, la
+ * misma apertura que falló lo encuentra en el nuevo puerto — sin reiniciar la
+ * app, que es lo que se buscaba al detectar siempre (verificado 2026-08-05).
  */
 
 /** Vendor ID USB de la Raspberry Pi Foundation — así se identifica el Pico entre los puertos COM. */
@@ -48,7 +54,10 @@ const VID_PICO = "2E8A";
  */
 function detectarPuertoPico(): string | undefined {
   if (process.platform !== "win32") return undefined;
-  const script = `Get-CimInstance Win32_PnPEntity | Where-Object { $_.DeviceID -match 'VID_${VID_PICO}' -and $_.Name -match 'COM\\d+' } | Select-Object -First 1 -ExpandProperty Name`;
+  // Se filtra por clase `Ports` dentro de la consulta WMI en lugar de traer
+  // todos los dispositivos PnP y filtrarlos después: la máquina tiene cientos
+  // de dispositivos y uno solo de ellos es el Pico.
+  const script = `Get-CimInstance Win32_PnPEntity -Filter "PNPClass='Ports'" | Where-Object { $_.DeviceID -match 'VID_${VID_PICO}' } | Select-Object -First 1 -ExpandProperty Name`;
   const resultado = spawnSync("powershell", ["-NoProfile", "-Command", script], {
     encoding: "utf8",
   });
@@ -56,9 +65,23 @@ function detectarPuertoPico(): string | undefined {
   return match?.[0];
 }
 
-/** Puerto serie de la Pi: fijo por env var, o autodetectado en Windows. Sin ninguno, modo simulado. */
+/**
+ * Último puerto detectado. Evita repetir la consulta WMI —de segundos en una PC
+ * modesta— en cada apertura. Se descarta con `olvidarPuerto()` cuando un envío
+ * falla, para que el Pico se pueda reenchufar en otro COM sin reiniciar la app.
+ */
+let puertoCacheado: string | undefined;
+
+/** Puerto serie de la Pi: fijo por env var, o autodetectado (y cacheado) en Windows. Sin ninguno, modo simulado. */
 function resolverPuerto(): string | undefined {
-  return process.env.MOLINETE_PORT ?? detectarPuertoPico();
+  if (process.env.MOLINETE_PORT) return process.env.MOLINETE_PORT;
+  puertoCacheado ??= detectarPuertoPico();
+  return puertoCacheado;
+}
+
+/** Descarta el puerto cacheado: la próxima resolución vuelve a detectarlo. */
+function olvidarPuerto(): void {
+  puertoCacheado = undefined;
 }
 
 /** Velocidad del puerto; debe coincidir con `BAUD_RATE` en la Pi. */
@@ -134,18 +157,42 @@ class MolineteSimulado implements MolineteController {
 }
 
 /**
- * Envía la orden de apertura al molinete. Resuelve el puerto de nuevo en cada
- * llamada (ver comentario de arriba). Nunca lanza: un fallo de hardware no
- * debe romper el registro del ingreso, solo se deja constancia en el log.
+ * Manda la orden por el puerto que corresponda; simulado si no hay ninguno.
+ * Devuelve si había hardware, para no dejar el modo simulado pegado: sin Pico
+ * al arrancar la app, cada apertura vuelve a buscarlo (es la única forma de
+ * que aparezca al enchufarlo, ya que el simulado nunca falla).
+ */
+async function intentarAbrir(): Promise<boolean> {
+  const puerto = resolverPuerto();
+  if (!puerto) {
+    await new MolineteSimulado().abrir();
+    return false;
+  }
+  await new MolineteSerie(puerto).abrir();
+  return true;
+}
+
+/**
+ * Envía la orden de apertura al molinete. Usa el puerto cacheado; si el envío
+ * falla —típicamente porque el Pico se reenchufó y Windows le dio otro COM—,
+ * lo descarta, vuelve a detectarlo y reintenta una sola vez.
+ *
+ * Nunca lanza: un fallo de hardware no debe romper el registro del ingreso,
+ * solo se deja constancia en el log.
  */
 export async function abrirMolinete(): Promise<void> {
-  const puerto = resolverPuerto();
-  const controlador: MolineteController = puerto
-    ? new MolineteSerie(puerto)
-    : new MolineteSimulado();
+  try {
+    // Si no se encontró hardware, se descarta el "sin puerto" cacheado para
+    // que la próxima apertura vuelva a buscar el Pico.
+    if (!(await intentarAbrir())) olvidarPuerto();
+    return;
+  } catch (error) {
+    console.warn("[molinete] Falló el envío, reintentando con redetección:", error);
+    olvidarPuerto();
+  }
 
   try {
-    await controlador.abrir();
+    await intentarAbrir();
   } catch (error) {
     console.error("[molinete] No se pudo abrir:", error);
   }
