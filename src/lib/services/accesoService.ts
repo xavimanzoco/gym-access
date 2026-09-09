@@ -45,8 +45,12 @@ export const accesoService = {
       motivo,
     });
 
+    // Sin `await` a propósito: la orden al hardware puede tardar segundos
+    // (proceso serie) y no debe demorar la pantalla del kiosco. `abrirMolinete`
+    // nunca lanza — atrapa sus errores y los deja en el log —, así que no queda
+    // ninguna promesa rechazada suelta.
     if (permitido) {
-      await abrirMolinete();
+      void abrirMolinete();
     }
 
     const diasParaVencer = socio?.vencimiento
@@ -74,7 +78,8 @@ export const accesoService = {
       motivo: "MANUAL",
     });
 
-    await abrirMolinete();
+    // Ver comentario en `registrarIngreso`: la orden va sin esperar.
+    void abrirMolinete();
 
     return {
       permitido: true,
