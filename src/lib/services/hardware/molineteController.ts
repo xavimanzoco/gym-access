@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 
 /**
@@ -79,9 +79,13 @@ function resolverPuerto(): string | undefined {
   return puertoCacheado;
 }
 
-/** Descarta el puerto cacheado: la próxima resolución vuelve a detectarlo. */
+/**
+ * Descarta el puerto cacheado: la próxima resolución vuelve a detectarlo.
+ * También cierra el canal vivo, que quedó apuntando a un puerto que ya no sirve.
+ */
 function olvidarPuerto(): void {
   puertoCacheado = undefined;
+  cerrarCanalVivo();
 }
 
 /** Velocidad del puerto; debe coincidir con `BAUD_RATE` en la Pi. */
@@ -147,6 +151,187 @@ class MolineteSerie implements MolineteController {
 }
 
 /**
+ * Implementación rápida: deja UN PowerShell vivo con el puerto abierto y le
+ * pasa cada orden por su entrada estándar.
+ *
+ * `MolineteSerie` arranca un PowerShell por apertura, y eso cuesta ~270 ms de
+ * arranque más los 300 ms de espera del script — más de medio segundo por
+ * ingreso. Manteniendo el proceso vivo, la orden es solo una línea escrita a un
+ * proceso que ya está esperando: medido en ~3 ms (2026-09-09, PC de desarrollo).
+ *
+ * El puerto queda ABIERTO entre aperturas, que es la diferencia real. Si el
+ * Pico se desenchufa, la escritura falla y `abrirMolinete` cae a
+ * `MolineteSerie` —el método confirmado en el gimnasio— sin que el molinete
+ * deje de responder.
+ *
+ * Se usa el mismo `System.IO.Ports.SerialPort` con DTR/RTS activos que ya está
+ * confirmado con este hardware (ver ESTADO.md); lo único que cambia es cuántas
+ * veces se abre el puerto.
+ */
+class MolineteCanalVivo implements MolineteController {
+  private proceso?: ReturnType<typeof spawn>;
+  private pendientes: { ok: () => void; falla: (e: Error) => void }[] = [];
+  private listo?: Promise<void>;
+
+  constructor(private readonly puerto: string) {}
+
+  /** Levanta el PowerShell y espera a que confirme que abrió el puerto. */
+  private arrancar(): Promise<void> {
+    const script = [
+      "$ErrorActionPreference = 'Stop'",
+      "try {",
+      `  $p = New-Object System.IO.Ports.SerialPort '${this.puerto}',${BAUD},None,8,One`,
+      "  $p.DtrEnable = $true",
+      "  $p.RtsEnable = $true",
+      "  $p.Open()",
+      "} catch { Write-Output \"ERR $($_.Exception.Message)\"; exit 1 }",
+      "Write-Output 'LISTO'",
+      "while ($true) {",
+      "  $linea = [Console]::In.ReadLine()",
+      "  if ($linea -eq $null -or $linea -eq 'SALIR') { break }",
+      `  try { $p.Write("${COMANDO_ABRIR.replace("\n", "\`n")}"); Write-Output 'OK' }`,
+      "  catch { Write-Output \"ERR $($_.Exception.Message)\" }",
+      "}",
+      "$p.Close()",
+    ].join("\n");
+
+    const proceso = spawn(
+      "powershell",
+      ["-NoProfile", "-NonInteractive", "-Command", script],
+      { stdio: ["pipe", "pipe", "pipe"] },
+    );
+    this.proceso = proceso;
+    proceso.stdout?.setEncoding("utf8");
+
+    return new Promise<void>((resolver, rechazar) => {
+      const tiempo = setTimeout(() => {
+        this.cerrar();
+        rechazar(new Error(`el canal a ${this.puerto} no respondió en 5s`));
+      }, 5000);
+
+      proceso.stdout?.on("data", (datos: string) => {
+        for (const linea of datos.split(/\r?\n/).filter(Boolean)) {
+          if (linea === "LISTO") {
+            clearTimeout(tiempo);
+            resolver();
+          } else if (linea === "OK") {
+            this.pendientes.shift()?.ok();
+          } else if (linea.startsWith("ERR")) {
+            clearTimeout(tiempo);
+            const error = new Error(linea.slice(4).trim() || "error en el canal");
+            this.pendientes.shift()?.falla(error);
+            rechazar(error);
+          }
+        }
+      });
+
+      // Si el proceso muere, todo lo que esperaba respuesta falla: así la
+      // apertura cae al método de respaldo en vez de quedarse colgada.
+      proceso.on("exit", () => {
+        clearTimeout(tiempo);
+        const error = new Error("el canal al molinete se cerró");
+        for (const p of this.pendientes.splice(0)) p.falla(error);
+        this.proceso = undefined;
+        this.listo = undefined;
+        rechazar(error);
+      });
+      proceso.on("error", (error) => {
+        clearTimeout(tiempo);
+        rechazar(error);
+      });
+    });
+  }
+
+  async abrir(): Promise<void> {
+    this.listo ??= this.arrancar();
+    try {
+      await this.listo;
+    } catch (error) {
+      this.listo = undefined;
+      throw error;
+    }
+
+    const proceso = this.proceso;
+    if (!proceso?.stdin?.writable) throw new Error("el canal al molinete no está abierto");
+
+    await new Promise<void>((ok, falla) => {
+      const tiempo = setTimeout(() => {
+        this.pendientes = this.pendientes.filter((p) => p.ok !== ok);
+        falla(new Error("el molinete no confirmó la apertura en 3s"));
+      }, 3000);
+
+      this.pendientes.push({
+        ok: () => {
+          clearTimeout(tiempo);
+          ok();
+        },
+        falla: (e) => {
+          clearTimeout(tiempo);
+          falla(e);
+        },
+      });
+      proceso.stdin?.write(COMANDO_ABRIR);
+    });
+
+    console.info(`[molinete] Orden "ABRIR" enviada a ${this.puerto} (canal vivo)`);
+  }
+
+  /** Cierra el canal; la próxima apertura lo levanta de nuevo. */
+  cerrar(): void {
+    const proceso = this.proceso;
+    this.proceso = undefined;
+    this.listo = undefined;
+    for (const p of this.pendientes.splice(0)) {
+      p.falla(new Error("el canal se cerró"));
+    }
+    if (proceso) {
+      try {
+        proceso.stdin?.write("SALIR\n");
+      } catch {
+        /* el proceso ya no acepta escrituras */
+      }
+      proceso.kill();
+    }
+  }
+}
+
+/**
+ * El canal vivo se puede apagar poniendo `MOLINETE_CANAL_VIVO=0`, para volver
+ * al método de un proceso por apertura sin reinstalar nada.
+ */
+const CANAL_VIVO_HABILITADO = process.env.MOLINETE_CANAL_VIVO !== "0";
+
+/** Canal abierto, reusado entre aperturas mientras siga siendo el mismo puerto. */
+let canal: { puerto: string; instancia: MolineteCanalVivo } | undefined;
+
+function canalVivo(puerto: string): MolineteCanalVivo {
+  if (canal?.puerto !== puerto) {
+    canal?.instancia.cerrar();
+    canal = { puerto, instancia: new MolineteCanalVivo(puerto) };
+  }
+  return canal.instancia;
+}
+
+/** Cierra el canal abierto; la próxima apertura levanta uno nuevo. */
+function cerrarCanalVivo(): void {
+  canal?.instancia.cerrar();
+  canal = undefined;
+}
+
+/** Cómo está el controlador ahora mismo. Lo usa la pantalla de diagnóstico. */
+export function describirMolinete(): {
+  canalVivoHabilitado: boolean;
+  estadoCanal: string;
+  puertoCacheado?: string;
+} {
+  return {
+    canalVivoHabilitado: CANAL_VIVO_HABILITADO,
+    estadoCanal: canal ? "abierto" : "cerrado",
+    puertoCacheado,
+  };
+}
+
+/**
  * Implementación temporal: registra la orden en consola pero no toca hardware.
  * Permite probar todo el flujo de acceso sin la Pi conectada.
  */
@@ -168,6 +353,20 @@ async function intentarAbrir(): Promise<boolean> {
     await new MolineteSimulado().abrir();
     return false;
   }
+
+  // Primero el canal vivo (milisegundos). Si falla por lo que sea, se cae al
+  // método de un proceso por apertura, que es el confirmado en el gimnasio: el
+  // peor caso es tardar como antes, nunca no abrir.
+  if (process.platform === "win32" && CANAL_VIVO_HABILITADO) {
+    try {
+      await canalVivo(puerto).abrir();
+      return true;
+    } catch (error) {
+      console.warn("[molinete] Canal vivo falló, se usa el método por proceso:", error);
+      cerrarCanalVivo();
+    }
+  }
+
   await new MolineteSerie(puerto).abrir();
   return true;
 }
@@ -181,19 +380,40 @@ async function intentarAbrir(): Promise<boolean> {
  * solo se deja constancia en el log.
  */
 export async function abrirMolinete(): Promise<void> {
+  await abrirMolineteConResultado();
+}
+
+/** Cómo terminó una apertura. */
+export type ResultadoOrden =
+  | { estado: "abierto" }
+  /** No hay Pico conectado: la orden se registró pero nada se movió. */
+  | { estado: "sin-hardware" }
+  | { estado: "falló"; error: string };
+
+/**
+ * Igual que `abrirMolinete` pero contando cómo salió, para que el diagnóstico
+ * pueda mostrar la verdad. El flujo de ingreso usa `abrirMolinete`, que ignora
+ * el resultado: un fallo de hardware no debe romper el registro del acceso.
+ */
+export async function abrirMolineteConResultado(): Promise<ResultadoOrden> {
   try {
     // Si no se encontró hardware, se descarta el "sin puerto" cacheado para
     // que la próxima apertura vuelva a buscar el Pico.
-    if (!(await intentarAbrir())) olvidarPuerto();
-    return;
+    if (await intentarAbrir()) return { estado: "abierto" };
+    olvidarPuerto();
+    return { estado: "sin-hardware" };
   } catch (error) {
     console.warn("[molinete] Falló el envío, reintentando con redetección:", error);
     olvidarPuerto();
   }
 
   try {
-    await intentarAbrir();
+    return (await intentarAbrir()) ? { estado: "abierto" } : { estado: "sin-hardware" };
   } catch (error) {
     console.error("[molinete] No se pudo abrir:", error);
+    return {
+      estado: "falló",
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
